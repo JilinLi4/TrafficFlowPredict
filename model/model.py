@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch.autograd import Variable
+from .snp import SNPModule
 
 # from main import device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -148,45 +149,17 @@ class TATT(nn.Module):
             nn.ReLU(),
             nn.Linear(forward_expansion * embed_size, embed_size),
         )
-        self.snp_forward_fc1 = nn.Linear(embed_size, forward_expansion * embed_size)
-        self.snp_forward_fc2 = nn.Linear(forward_expansion * embed_size, embed_size)
-        self.rho1 = nn.Sequential(
-            nn.Linear(embed_size, embed_size//8),
-            nn.Tanh(),
-            nn.Dropout(dropout),
-            nn.Linear(embed_size//8, embed_size)
-        )
 
-        self.rho2 = nn.Sequential(
-            nn.Linear(embed_size, embed_size//8),
-            nn.Tanh(),
-            nn.Dropout(dropout),
-            nn.Linear(embed_size//8, embed_size)
-        )
-
-        self.g = nn.Hardswish()
-
+        self.snp_attention = SNPModule(embed_size, forward_expansion, 8, dropout)
         self.dropout = nn.Dropout(dropout)
-       
 
 
-    def forward(self, value, key, query, t, T = 0):
+    def forward(self, value, key, query, t):
         attention = self.attention(query, query, query)
         x = self.dropout(self.norm1(attention + query))
-        self.zero_x = torch.zeros_like(x)
-        # x.size: (b, n)
-        # if x > T fire
-        fire_data = torch.where(x > T, x, self.zero_x)
-        # if x < T not fire
-        not_fire_data = torch.where(x < T, x, self.zero_x)
-
-        forward_fire = self.rho1(fire_data) * fire_data - self.rho2(fire_data) * self.g(fire_data)
-
-        forward_not_fire = self.feed_forward(not_fire_data)
-        forward = forward_fire + forward_not_fire
+        forward = self.snp_attention(x)
         out = self.dropout(self.norm2(forward + x))
         return out
-
 
 
 class Attention(nn.Module):
