@@ -19,7 +19,7 @@
             "program": "train.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--dataset", "PEMS04"]
+            "args": ["--dataset", "PEMS04", "--exp_name", "Debug"]
         }
     ]
 }

@@ -14,12 +14,13 @@ import argparse
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, default="PEMS03", help="the datasets name")
+parser.add_argument('--exp_name', type=str, default="snp", help="the datasets name")
 parser.add_argument('--train_rate', type=float, default=0.6, help="The ratio of training set")
 parser.add_argument('--seq_len', type=int, default=12, help="The length of input sequence")
 parser.add_argument('--pre_len', type=int, default=12, help="The length of output sequence")
 parser.add_argument('--batchsize', type=int, default=16, help="Number of training batches")
 parser.add_argument('--heads', type=int, default=4, help="The number of heads of multi-head attention")
-parser.add_argument('--dropout', type=float, default=0, help="Dropout")
+parser.add_argument('--dropout', type=float, default=0.2, help="Dropout")
 parser.add_argument('--lr', type=float, default=0.0001, help="Learning rate")
 parser.add_argument('--in_dim', type=float, default=1, help="Dimensionality of input data")
 parser.add_argument('--embed_size', type=float, default=64, help="Embed_size")
@@ -38,15 +39,6 @@ if __name__ == "__main__":
     val_data = TensorDataset(valX, valY)
     val_dataloader = DataLoader(val_data, batch_size=args.batchsize)
 
-    # adj,
-    # in_channels,
-    # embed_size,
-    # T_dim,
-    # output_T_dim,
-    # heads,
-    # forward_expansion,
-    # dropout = 0
-
     model = MVSTT(adj, args.in_dim, args.embed_size, args.seq_len, args.pre_len, args.heads, 4, args.dropout)
     model = model.to(device)
     criterion = nn.MSELoss()
@@ -55,6 +47,21 @@ if __name__ == "__main__":
     best_mae = 100
     best_rmse = None
     best_mape = None
+    log_save_dir = f"result/{args.exp_name}_{ args.pre_len * 5}min_{args.dataset}_mean_std.txt"
+    print(f"log dir: {log_save_dir}")
+    
+    # write exp information
+    config_info = ""
+    config_info = config_info + f"exp_name: {args.exp_name} \n"
+    config_info = config_info + f"batchsize: {args.batchsize} \n"
+    config_info = config_info + f"dropout: {args.dropout} \n"
+    config_info = config_info + f"in_dim: {args.in_dim} \n"
+    config_info = config_info + f"embed_size: {args.embed_size} \n"
+    config_info = config_info + f"epochs: {args.epochs} \n"
+    print("Config++++++++++++++")
+    print(config_info)
+    with open(log_save_dir, "a+", encoding='utf-8') as f:
+        f.write(config_info)
 
     for epoch in range(args.epochs):
         model.train()
@@ -93,7 +100,7 @@ if __name__ == "__main__":
         file = str(t)[10:-7].replace(":", "-")
         if not os.path.exists(os.path.join("Model/PEMS/{}/{}".format(DATANAME, dir))):
             os.makedirs(os.path.join("Model/PEMS/{}/{}".format(DATANAME, dir)))
-        torch.save(model.state_dict(), "Model/PEMS/{}/{}/epoch+{}+time{}.pkl".format(DATANAME, dir, epoch, file))
+        # torch.save(model.state_dict(), "Model/PEMS/{}/{}/epoch+{}+time{}.pkl".format(DATANAME, dir, epoch, file))
 
         with open("result/{}min_{}_mean_std.txt".format(args.pre_len * 5, DATANAME), "a+") as f:
             f.write("{}>>>>{} min pre：rmse:{},mae:{},mape:{}".format(str(t), args.pre_len * 5, rmse, mae,
@@ -104,10 +111,16 @@ if __name__ == "__main__":
             best_mae = mae
             best_mape = mape
             print("now best mae:>>>>>>>>>>>>>", best_rmse, best_mae, best_mape)
-            with open("result/{}min_{}_mean_std.txt".format(args.pre_len * 5, DATANAME), "a+") as f:
+            with open("result/{}_{}min_{}_mean_std.txt".format(args.exp_name, args.pre_len * 5, DATANAME), "a+") as f:
                 f.write(
                     "{}>>>>{} min pre：rmse:{},mae:{},mape:{}".format(str(t), args.pre_len * 5, best_rmse, best_mae,
                                                                           best_mape) + "\n")
+
+    print("best mae:>>>>>>>>>>>>>", best_rmse, best_mae, best_mape)
+    with open("result/{}_{}min_{}_mean_std.txt".format(args.exp_name, args.pre_len * 5, DATANAME), "a+") as f:
+        f.write(
+            "-----------------------\n{}>>>>{} min pre: rmse:{},mae:{},mape:{}".format(str(t), args.pre_len * 5, best_rmse, best_mae,
+                                                                    best_mape) + "\n")
 
 
 
