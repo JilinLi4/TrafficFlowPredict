@@ -10,5 +10,7 @@
 # python train.py --dataset PEMS04  --dropout 0.0 --batchsize 16 --lr 0.0001 
 
 # dropout 0.2 lr: 0.0001 
-python train.py --dataset PEMS04  --dropout 0.0 --batchsize 16 --lr 0.0001  --exp_name snp_baseline
+# python train.py --dataset PEMS04  --dropout 0.0 --batchsize 16 --lr 0.0001  --exp_name snp_baseline
 # python train.py --dataset PEMS04  --dropout 0.2 --batchsize 16 --lr 0.0001
+pip install -r requirement.txt
+python train.py --dataset PEMS04  --dropout 0.0 --batchsize 16 --lr 0.0001  --exp_name lstm_snp_baseline

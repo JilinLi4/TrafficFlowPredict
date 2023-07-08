@@ -15,6 +15,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, default="PEMS03", help="the datasets name")
 parser.add_argument('--exp_name', type=str, default="snp", help="the datasets name")
+parser.add_argument('--exp_dir', type=str, default="./result", help="the datasets name")
+
 parser.add_argument('--train_rate', type=float, default=0.6, help="The ratio of training set")
 parser.add_argument('--seq_len', type=int, default=12, help="The length of input sequence")
 parser.add_argument('--pre_len', type=int, default=12, help="The length of output sequence")
@@ -48,8 +50,12 @@ if __name__ == "__main__":
     best_rmse = None
     best_mape = None
     best_epoch = 0
-    log_save_dir = f"result/{args.exp_name}_{ args.pre_len * 5}min_{args.dataset}_mean_std.txt"
-    print(f"log dir: {log_save_dir}")
+
+    exp_dir = os.path.join(args.exp_dir, args.exp_name)
+    if os.path.exists(exp_dir) == False:
+        os.makedirs(exp_dir)
+    log_save_dir = f"{exp_dir}/{args.exp_name}_{ args.pre_len * 5}min_{args.dataset}_mean_std.txt"
+    print(f"Experment directory: {exp_dir}")
     
     # write exp information
     config_info = ""
@@ -99,8 +105,8 @@ if __name__ == "__main__":
         t = datetime.datetime.now()
         dir = str(t)[0:10]
         file = str(t)[10:-7].replace(":", "-")
-        if not os.path.exists(os.path.join("Model/PEMS/{}/{}".format(DATANAME, dir))):
-            os.makedirs(os.path.join("Model/PEMS/{}/{}".format(DATANAME, dir)))
+        # if not os.path.exists(os.path.join("Model/PEMS/{}/{}".format(DATANAME, dir))):
+        #     os.makedirs(os.path.join("Model/PEMS/{}/{}".format(DATANAME, dir)))
         # torch.save(model.state_dict(), "Model/PEMS/{}/{}/epoch+{}+time{}.pkl".format(DATANAME, dir, epoch, file))
         if mae < best_mae:
             best_rmse = rmse
