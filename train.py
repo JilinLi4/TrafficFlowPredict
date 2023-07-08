@@ -47,6 +47,7 @@ if __name__ == "__main__":
     best_mae = 100
     best_rmse = None
     best_mape = None
+    best_epoch = 0
     log_save_dir = f"result/{args.exp_name}_{ args.pre_len * 5}min_{args.dataset}_mean_std.txt"
     print(f"log dir: {log_save_dir}")
     
@@ -93,7 +94,7 @@ if __name__ == "__main__":
         label = label.reshape(-1, adj.shape[0])
 
         mae, rmse, mape, wape = metric(pre.numpy(), label.numpy())
-        print("rmse,mae,mape,wape:", epoch, rmse, mae, mape, wape)
+        
         DATANAME = args.dataset
         t = datetime.datetime.now()
         dir = str(t)[0:10]
@@ -101,26 +102,18 @@ if __name__ == "__main__":
         if not os.path.exists(os.path.join("Model/PEMS/{}/{}".format(DATANAME, dir))):
             os.makedirs(os.path.join("Model/PEMS/{}/{}".format(DATANAME, dir)))
         # torch.save(model.state_dict(), "Model/PEMS/{}/{}/epoch+{}+time{}.pkl".format(DATANAME, dir, epoch, file))
-
-        with open("result/{}min_{}_mean_std.txt".format(args.pre_len * 5, DATANAME), "a+") as f:
-            f.write("{}>>>>{} min pre：rmse:{},mae:{},mape:{}".format(str(t), args.pre_len * 5, rmse, mae,
-                                                                          mape) + "\n")
-
         if mae < best_mae:
             best_rmse = rmse
             best_mae = mae
             best_mape = mape
-            print("now best mae:>>>>>>>>>>>>>", best_rmse, best_mae, best_mape)
+            best_epoch = epoch
             with open("result/{}_{}min_{}_mean_std.txt".format(args.exp_name, args.pre_len * 5, DATANAME), "a+") as f:
-                f.write(
-                    "{}>>>>{} min pre：rmse:{},mae:{},mape:{}".format(str(t), args.pre_len * 5, best_rmse, best_mae,
-                                                                          best_mape) + "\n")
+                f.write(f"Best MAE: Epoch: {best_epoch}, MAE: {best_mae}, RMSE: {best_rmse}, MAPE: {best_mape}\n")
 
-    print("best mae:>>>>>>>>>>>>>", best_rmse, best_mae, best_mape)
-    with open("result/{}_{}min_{}_mean_std.txt".format(args.exp_name, args.pre_len * 5, DATANAME), "a+") as f:
-        f.write(
-            "-----------------------\n{}>>>>{} min pre: rmse:{},mae:{},mape:{}".format(str(t), args.pre_len * 5, best_rmse, best_mae,
-                                                                    best_mape) + "\n")
+        print(f"Current epoch: {epoch}\t MAE: {mae}\t RMSE: {rmse}\t MAPE: {mape}\t WAPE: {wape}")
+        print(f"Best MAE at epoch: {best_epoch}\t MAE: {best_mae}\t RMSE: {best_rmse}\t MAPE: {best_mape}")
 
-
-
+    print("--"*20)
+    print(f"Best MAE at epoch: {best_epoch}\t MAE: {best_mae}\t RMSE: {best_rmse}\t MAPE: {best_mape}")
+    with open(log_save_dir, "a+") as f:
+        f.write(f"Best MAE at epoch: {best_epoch}\t MAE: {best_mae}\t RMSE: {best_rmse}\t MAPE: {best_mape}\n")
