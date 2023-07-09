@@ -10,6 +10,10 @@ from model import MVSTT
 from utils import metric
 import argparse
 
+from torch.optim.lr_scheduler import CosineAnnealingLR  # example
+from opt import WarmUpScheduler
+
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
@@ -24,6 +28,7 @@ parser.add_argument('--batchsize', type=int, default=16, help="Number of trainin
 parser.add_argument('--heads', type=int, default=4, help="The number of heads of multi-head attention")
 parser.add_argument('--dropout', type=float, default=0.2, help="Dropout")
 parser.add_argument('--lr', type=float, default=0.0001, help="Learning rate")
+parser.add_argument('--weight_decay', type=float, default=1e-4, help="Learning rate")
 parser.add_argument('--in_dim', type=float, default=1, help="Dimensionality of input data")
 parser.add_argument('--embed_size', type=float, default=64, help="Embed_size")
 parser.add_argument('--epochs', type=int, default=100, help="epochs")
@@ -45,7 +50,13 @@ if __name__ == "__main__":
     model = model.to(device)
     criterion = nn.MSELoss()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    lr_scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs * len(train_dataloader))
+    warmup_scheduler = WarmUpScheduler(optimizer, lr_scheduler,
+                                   len_loader=len(train_dataloader),
+                                   warmup_steps=len(train_dataloader) * args.epochs * 0.05,
+                                   warmup_start_lr=args.lr / 10,
+                                   warmup_mode='linear')
     best_mae = 100
     best_rmse = None
     best_mape = None
@@ -65,6 +76,8 @@ if __name__ == "__main__":
     config_info = config_info + f"in_dim: {args.in_dim} \n"
     config_info = config_info + f"embed_size: {args.embed_size} \n"
     config_info = config_info + f"epochs: {args.epochs} \n"
+    config_info = config_info + f"lr: {args.lr} \n"
+    config_info = config_info + f"weight_decay: {args.weight_decay} \n"
     print("Config++++++++++++++")
     print(config_info)
     with open(log_save_dir, "a+", encoding='utf-8') as f:
@@ -80,10 +93,11 @@ if __name__ == "__main__":
 
             loss = criterion(pre * std + mean, y)
             if batch % 100 == 0:
-                print(f"epoch: {epoch} \tbatch: {batch}, \tloss: {loss.item()}")
+                print(f"epoch: {epoch} \tbatch: {batch}, \tloss: {loss.item()}, lr: {lr_scheduler.get_lr()[0]}")
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            warmup_scheduler.step()
 
         model.eval()
         P = []
@@ -120,6 +134,6 @@ if __name__ == "__main__":
         print(f"Best MAE at epoch: {best_epoch}\t MAE: {best_mae}\t RMSE: {best_rmse}\t MAPE: {best_mape}")
 
     print("--"*20)
-    print(f"Best MAE at epoch: {best_epoch}\t MAE: {best_mae}\t RMSE: {best_rmse}\t MAPE: {best_mape}")
+    print(f"{args.exp_name} Best MAE at epoch: {best_epoch}\t MAE: {best_mae}\t RMSE: {best_rmse}\t MAPE: {best_mape}")
     with open(log_save_dir, "a+") as f:
         f.write(f"Best MAE at epoch: {best_epoch}\t MAE: {best_mae}\t RMSE: {best_rmse}\t MAPE: {best_mape}\n")
