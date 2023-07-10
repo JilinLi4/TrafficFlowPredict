@@ -51,7 +51,7 @@ if __name__ == "__main__":
     criterion = nn.MSELoss()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    lr_scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs * len(train_dataloader))
+    lr_scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs)
     warmup_scheduler = WarmUpScheduler(optimizer, lr_scheduler,
                                    len_loader=len(train_dataloader),
                                    warmup_steps=len(train_dataloader) * args.epochs * 0.05,
@@ -93,7 +93,9 @@ if __name__ == "__main__":
 
             loss = criterion(pre * std + mean, y)
             if batch % 100 == 0:
-                print(f"epoch: {epoch} \tbatch: {batch}, \tloss: {loss.item()}, lr: {lr_scheduler.get_lr()[0]}")
+                print(f"epoch: {epoch} \tbatch: {batch} \tloss: {loss.item()}\t lr: {lr_scheduler.get_lr()[0]}")
+                with open(log_save_dir, "a+") as f:
+                    f.write(f"epoch: {epoch} \tbatch: {batch}, \tloss: {loss.item()}\t lr: {lr_scheduler.get_lr()[0]}\n")
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
