@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import numpy as np
 
 class SNPModule(nn.Module):
     def __init__(self, embed_size:int, forward_expansion: float, liner_sub_sample = 8, dropout:float = 0., *args, **kward) -> None:
@@ -41,6 +42,34 @@ class SNPModule(nn.Module):
         forward_not_fire = self.feed_forward(not_fire_data)
         forward = forward_fire + forward_not_fire
         return forward
+
+class SNPAttention(nn.Module):
+    def __init__(self, embed_size):
+        super(SNPAttention, self).__init__()
+        self.snp = SNPModule(embed_size, 1)
+
+    def forward(self, Q, K, V):
+        B, n_heads, len1, len2, d_k = Q.shape
+        scores = torch.matmul(Q, K.transpose(-1, -2)) / np.sqrt(d_k)
+        # # scores : [batch_size, n_heads, T(Spatial) or N(Temporal), N(Spatial) or T(Temporal), N(Spatial) or T(Temporal)]
+        # # scores.masked_fill_(attn_mask, -1e9) # Fills elements of self tensor with value where mask is True.
+
+        # attn = nn.Softmax(dim=-1)(scores)
+        b, heads, n, hidden_dim, _ = scores.size()
+        attns = []
+        # batch size hidden 307, vector_length, vector_length
+        for i in range(heads):
+            # batch size 307, vector_length, vector_length
+            # batch_size * 307, vector_length * vector_length
+            score = scores[:,i,...]
+            score = score.reshape([b*n, hidden_dim * hidden_dim])
+            attn_i = self.snp(score)
+            attn_i = attn_i.reshape(b,1,n, hidden_dim, hidden_dim)
+            attns.append(attn_i)
+        attn = torch.concat(attns, dim=1)
+        context = torch.matmul(attn,
+                               V)  # [batch_size, n_heads, T(Spatial) or N(Temporal), N(Spatial) or T(Temporal), d_k]]
+        return context
 
 
 class SNPLSTM(nn.Module):

@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch.autograd import Variable
-from .snp import SNPModule
+from .snp import SNPModule, SNPAttention
 from .lstm import CustomLSTM
 
 # from main import device
@@ -37,6 +37,7 @@ class SMultiHeadAttention(nn.Module):
         self.W_Q = nn.Linear(self.embed_size, self.head_dim * self.heads, bias=False)
         self.fc_out = nn.Linear(heads * self.head_dim, embed_size)
 
+
     def forward(self, input_Q, input_K, input_V):
         B, N, T, C = input_Q.shape
 
@@ -60,13 +61,16 @@ class TMultiHeadAttention(nn.Module):
         self.W_K = nn.Linear(self.embed_size, self.head_dim * self.heads, bias=False)
         self.W_Q = nn.Linear(self.embed_size, self.head_dim * self.heads, bias=False)
         self.fc_out = nn.Linear(heads * self.head_dim, embed_size)
+        self.snp_attention = SNPAttention(12 * 12)
+        
 
     def forward(self, input_Q, input_K, input_V):
         B, N, T, C = input_Q.shape
         Q = self.W_Q(input_Q).view(B, N, T, self.heads, self.head_dim).permute(0, 3, 1, 2, 4)  # Q: [B, h, N, T, d_k]
         K = self.W_K(input_K).view(B, N, T, self.heads, self.head_dim).permute(0, 3, 1, 2, 4)  # K: [B, h, N, T, d_k]
         V = self.W_V(input_V).view(B, N, T, self.heads, self.head_dim).permute(0, 3, 1, 2, 4)  # V: [B, h, N, T, d_k]
-        context = ScaledDotProductAttention()(Q, K, V)  # [B, h, N, T, d_k]
+        # context = ScaledDotProductAttention()(Q, K, V)  # [B, h, N, T, d_k]
+        context = self.snp_attention(Q,K,V)
         context = context.permute(0, 2, 3, 1, 4)  # [B, N, T, h, d_k]
         context = context.reshape(B, N, T, self.heads * self.head_dim)  # [B, N, T, C]
         output = self.fc_out(context)  # [batch_size, len_q, d_model]

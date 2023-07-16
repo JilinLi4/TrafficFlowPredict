@@ -129,7 +129,7 @@ if __name__ == "__main__":
             best_mae = mae
             best_mape = mape
             best_epoch = epoch
-            with open("result/{}_{}min_{}_mean_std.txt".format(args.exp_name, args.pre_len * 5, DATANAME), "a+") as f:
+            with open(log_save_dir, "a+") as f:
                 f.write(f"Best MAE: Epoch: {best_epoch}, MAE: {best_mae}, RMSE: {best_rmse}, MAPE: {best_mape}\n")
 
         print(f"Current epoch: {epoch}\t MAE: {mae}\t RMSE: {rmse}\t MAPE: {mape}\t WAPE: {wape}")
