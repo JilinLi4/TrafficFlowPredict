@@ -70,4 +70,26 @@ class SNPLSTM(nn.Module):
         """
         if isinstance(x) == torch.tensor:
             raise TypeError("The type of input must be torch.tensor")
-        
+
+class PyramidLayer(nn.Module):
+    def __init__(self, dim, t_ratio, qkv_bias=True) -> None:
+        super().__init__()
+        self.first_layer = nn.Conv2d(dim, int(dim * t_ratio), kernel_size=1, bias=qkv_bias)
+        t_q_convs = []
+        for i in range(3):
+            t_q_convs.append(nn.Conv2d(int(dim * t_ratio), int(dim * t_ratio), kernel_size=(2, 1),stride=(2,1), bias=qkv_bias))
+        self.t_q_convs = nn.ModuleList(t_q_convs)
+        self.last = nn.Conv2d(22, 12, kernel_size=1, bias=qkv_bias)
+
+
+    def forward(self, x):
+        x = x.permute(0, 3, 2, 1)
+        x = self.first_layer(x)
+        results = []
+        results.append(x)
+        for t_q_conv in self.t_q_convs:
+            x = t_q_conv(x)
+            results.append(x)
+        y = torch.cat(results, dim=2).permute(0, 2, 3, 1)
+        y = self.last(y).permute(0, 2, 1, 3)
+        return y
