@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from .attention import DataEmbedding
 
 class SNPModule(nn.Module):
     def __init__(self, embed_size:int, forward_expansion: float, liner_sub_sample = 8, dropout:float = 0., *args, **kward) -> None:
@@ -93,3 +94,66 @@ class PyramidLayer(nn.Module):
         y = torch.cat(results, dim=2).permute(0, 2, 3, 1)
         y = self.last(y).permute(0, 2, 1, 3)
         return y
+
+class ConvLayer(nn.Module):
+    def __init__(self, c_in, window_size = 1, c_out= -1):
+        super(ConvLayer, self).__init__()
+        if c_out == -1:
+            c_out = c_in // 2
+
+        self.downConv = nn.Conv1d(in_channels=c_in,
+                                  out_channels=c_out,
+                                  kernel_size=window_size,
+                                  stride=window_size)
+        self.norm = nn.BatchNorm1d(c_out)
+        self.activation = nn.ELU()
+
+    def forward(self, x):
+        x = self.downConv(x)
+        x = self.norm(x)
+        x = self.activation(x)
+        return x
+
+class Bottleneck_Construct(nn.Module):
+    """Bottleneck convolution CSCM"""
+
+    def __init__(self, d_out, window_size):
+        super(Bottleneck_Construct, self).__init__()
+        self.conv_layers = []
+        up_size = 0
+        for i in range(len(window_size)):
+            self.conv_layers.append(ConvLayer(d_out//(2**(i-1))))
+            up_size += d_out//(2**(i-1))
+        self.conv_layers = nn.ModuleList(self.conv_layers)
+        self.up = ConvLayer(up_size, d_out)
+        self.norm = nn.LayerNorm(d_out)
+
+    def forward(self, enc_input):
+        # enc_input torch.Size([16, 12, 307, 64])
+        temp_input = self.down(enc_input).permute(0, 2, 1)
+        all_inputs = []
+        for i in range(len(self.conv_layers)):
+            temp_input = self.conv_layers[i](temp_input)
+            all_inputs.append(temp_input)
+
+        all_inputs = torch.cat(all_inputs, dim=2).transpose(1, 2)
+        all_inputs = self.up(all_inputs)
+        all_inputs = torch.cat([enc_input, all_inputs], dim=1)
+
+        all_inputs = self.norm(all_inputs)
+        return all_inputs
+
+class MultiScaleModule(nn.Module):
+    def __init__(self, d_enc_in, d_model, d_bottleneck, window_size, inner_size, dropout=0.1) -> None:
+        super().__init__()
+        # self.enc_embedding = DataEmbedding(
+        #     d_enc_in, d_model, dropout)
+        self.conv_layers = Bottleneck_Construct(
+            d_model, d_model//2, window_size, d_bottleneck)
+
+    def forward(self, enc_input):
+        B, N, T, H = enc_input.shape  # torch.Size([16, 307, 12, 64])
+        enc_input1 = enc_input.permute(0, 2, 1, 3)  # torch.Size([16, 12, 307, 64])
+        enc_input1 = self.conv_layers(enc_input1)
+        
+        
