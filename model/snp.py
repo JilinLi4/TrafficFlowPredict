@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from .attention import DataEmbedding
 
 class SNPModule(nn.Module):
     def __init__(self, embed_size:int, forward_expansion: float, liner_sub_sample = 8, dropout:float = 0., *args, **kward) -> None:
@@ -101,11 +100,11 @@ class ConvLayer(nn.Module):
         if c_out == -1:
             c_out = c_in // 2
 
-        self.downConv = nn.Conv1d(in_channels=c_in,
+        self.downConv = nn.Conv2d(in_channels=c_in,
                                   out_channels=c_out,
                                   kernel_size=window_size,
                                   stride=window_size)
-        self.norm = nn.BatchNorm1d(c_out)
+        self.norm = nn.BatchNorm2d(c_out)
         self.activation = nn.ELU()
 
     def forward(self, x):
@@ -117,43 +116,72 @@ class ConvLayer(nn.Module):
 class Bottleneck_Construct(nn.Module):
     """Bottleneck convolution CSCM"""
 
-    def __init__(self, d_out, window_size):
+    def __init__(self, d_out, scale_size, node_size=307):
         super(Bottleneck_Construct, self).__init__()
         self.conv_layers = []
         up_size = 0
-        for i in range(len(window_size)):
-            self.conv_layers.append(ConvLayer(d_out//(2**(i-1))))
-            up_size += d_out//(2**(i-1))
+        for i in range(scale_size):
+            cur_out_size = d_out//(2**i)
+            self.conv_layers.append(ConvLayer(cur_out_size))
+            up_size += cur_out_size //2
         self.conv_layers = nn.ModuleList(self.conv_layers)
-        self.up = ConvLayer(up_size, d_out)
-        self.norm = nn.LayerNorm(d_out)
+        self.up = ConvLayer(up_size, c_out=d_out)
+        self.up_att = nn.Sequential(*[
+            nn.Conv2d(in_channels=up_size,
+                      out_channels=d_out,
+                      kernel_size=1,
+                      stride=1),
+            nn.BatchNorm2d(d_out),
+            nn.Tanh()
+        ])
+        self.norm = nn.LayerNorm([d_out, node_size])
+        self.d_out = d_out
+        self.down = ConvLayer(d_out, c_out=d_out)
+        self.down_att = nn.Sequential(*[
+            nn.Conv2d(in_channels=d_out,
+                      out_channels=d_out,
+                      kernel_size=1,
+                      stride=1),
+            nn.BatchNorm2d(d_out),
+            nn.Tanh()
+        ])
 
     def forward(self, enc_input):
         # enc_input torch.Size([16, 12, 307, 64])
-        temp_input = self.down(enc_input).permute(0, 2, 1)
+        # temp_input = self.down(enc_input).permute(0, 2, 1)
+        # assert enc_input.shape[1] == self.d_out
+        temp_input = enc_input
         all_inputs = []
         for i in range(len(self.conv_layers)):
             temp_input = self.conv_layers[i](temp_input)
             all_inputs.append(temp_input)
 
-        all_inputs = torch.cat(all_inputs, dim=2).transpose(1, 2)
-        all_inputs = self.up(all_inputs)
-        all_inputs = torch.cat([enc_input, all_inputs], dim=1)
+        all_inputs = torch.cat(all_inputs, dim=1)
+        all_inputs_v = self.up(all_inputs)
+        all_inputs_a = self.up_att(all_inputs)
+        
+        enc_input_v = self.down(enc_input)
+        enc_input_a = self.down_att(enc_input)
 
-        all_inputs = self.norm(all_inputs)
+        all_inputs = all_inputs_v * all_inputs_a + enc_input_v * enc_input_a
+        # all_inputs = self.norm(all_inputs)
         return all_inputs
 
 class MultiScaleModule(nn.Module):
-    def __init__(self, d_enc_in, d_model, d_bottleneck, window_size, inner_size, dropout=0.1) -> None:
+    def __init__(self, d_enc_in, window_size, node_size=12) -> None:
         super().__init__()
-        # self.enc_embedding = DataEmbedding(
-        #     d_enc_in, d_model, dropout)
         self.conv_layers = Bottleneck_Construct(
-            d_model, d_model//2, window_size, d_bottleneck)
+            d_enc_in, 2, node_size=node_size)
 
     def forward(self, enc_input):
         B, N, T, H = enc_input.shape  # torch.Size([16, 307, 12, 64])
         enc_input1 = enc_input.permute(0, 2, 1, 3)  # torch.Size([16, 12, 307, 64])
-        enc_input1 = self.conv_layers(enc_input1)
-        
-        
+        enc_input = self.conv_layers(enc_input1).permute(0, 2, 1, 3)  # torch.Size([16, 307, 12, 64])
+        return enc_input
+
+if __name__ == '__main__':
+    model = MultiScaleModule(12, 2)
+    x = torch.randn((16, 307, 12, 64))
+    y = model(x)
+    print(x.shape)
+
