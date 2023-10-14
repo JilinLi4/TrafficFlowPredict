@@ -1,6 +1,6 @@
 import os
 import warnings
-os.environ['CUDA_VISIBLE_DEVICES'] = "1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 warnings.filterwarnings("ignore")
 import datetime
 import torch.nn as nn
@@ -26,7 +26,7 @@ parser.add_argument('--seq_len', type=int, default=12, help="The length of input
 parser.add_argument('--pre_len', type=int, default=12, help="The length of output sequence")
 parser.add_argument('--batchsize', type=int, default=16, help="Number of training batches")
 parser.add_argument('--heads', type=int, default=4, help="The number of heads of multi-head attention")
-parser.add_argument('--dropout', type=float, default=0.2, help="Dropout")
+parser.add_argument('--dropout', type=float, default=0.0, help="Dropout")
 parser.add_argument('--lr', type=float, default=0.0001, help="Learning rate")
 parser.add_argument('--weight_decay', type=float, default=1e-4, help="Learning rate")
 parser.add_argument('--in_dim', type=float, default=1, help="Dimensionality of input data")

@@ -6,6 +6,7 @@ import numpy as np
 from torch.autograd import Variable
 from .snp import SNPModule, SNPAttention
 from .lstm import CustomLSTM
+from .snp import PyramidLayer, MultiScaleModule
 
 # from main import device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -237,8 +238,11 @@ class STBlock(nn.Module):
         self.pool = nn.MaxPool2d((T_dim - T_dim // 3 + 1, 1))
         self.fs = nn.Linear(embed_size * T_dim, embed_size * T_dim)
         self.fg = nn.Linear(embed_size * T_dim, embed_size * T_dim)
+        # self.pyramid = PyramidLayer(embed_size, 1.0)
+        self.pyramid = MultiScaleModule(T_dim, 2, node_size=307)
 
     def forward(self, x):
+        x = self.pyramid(x)
         input_Transformer = x # torch.Size([16, 307, 12, 64])
         B, N, T, H = input_Transformer.shape
         # **********************************************************************************************
