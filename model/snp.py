@@ -206,7 +206,7 @@ class ConvLayer(nn.Module):
 class Bottleneck_Construct(nn.Module):
     """Bottleneck convolution CSCM"""
 
-    def __init__(self, d_out, scale_size, node_size=307):
+    def __init__(self, d_out, scale_size, node_size=307, embed_size=64):
         super(Bottleneck_Construct, self).__init__()
         self.conv_layers = []
         up_size = 0
@@ -216,25 +216,9 @@ class Bottleneck_Construct(nn.Module):
             up_size += cur_out_size //2
         self.conv_layers = nn.ModuleList(self.conv_layers)
         self.up = ConvLayer(up_size, c_out=d_out)
-        self.up_att = nn.Sequential(*[
-            nn.Conv2d(in_channels=up_size,
-                      out_channels=d_out,
-                      kernel_size=1,
-                      stride=1),
-            nn.BatchNorm2d(d_out),
-            nn.Tanh()
-        ])
-        self.norm = nn.LayerNorm([d_out, node_size])
+        self.norm = nn.LayerNorm(embed_size)
         self.d_out = d_out
         self.down = ConvLayer(d_out, c_out=d_out)
-        self.down_att = nn.Sequential(*[
-            nn.Conv2d(in_channels=d_out,
-                      out_channels=d_out,
-                      kernel_size=1,
-                      stride=1),
-            nn.BatchNorm2d(d_out),
-            nn.Tanh()
-        ])
 
     def forward(self, enc_input):
         # enc_input torch.Size([16, 12, 307, 64])
@@ -248,14 +232,10 @@ class Bottleneck_Construct(nn.Module):
 
         all_inputs = torch.cat(all_inputs, dim=1)
         all_inputs_v = self.up(all_inputs)
-        all_inputs_a = self.up_att(all_inputs)
-        
         enc_input_v = self.down(enc_input)
-        enc_input_a = self.down_att(enc_input)
-
         all_inputs = all_inputs_v + enc_input_v
         # all_inputs = all_inputs_v * all_inputs_a + enc_input_v * enc_input_a
-        # all_inputs = self.norm(all_inputs)
+        all_inputs = self.norm(all_inputs)
         return all_inputs
 
 class MultiScaleModule(nn.Module):

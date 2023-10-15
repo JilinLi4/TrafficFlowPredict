@@ -225,6 +225,7 @@ class STBlock(nn.Module):
         self.norm2 = nn.LayerNorm(embed_size)
         self.norm3 = nn.LayerNorm(embed_size)
         self.norm4 = nn.LayerNorm(embed_size)
+        self.norm_t = nn.LayerNorm(embed_size)
         self.Att = Attention(d_model=embed_size * T_dim, d_k=embed_size * 2, d_v=embed_size * 2, h=heads, dropout=0)
         # 缩小时间维度
         self.conv2 = nn.Conv2d(T_dim, output_T_dim, 1)
@@ -252,14 +253,14 @@ class STBlock(nn.Module):
         # **********************************************************************************************
         input_time = self.pyramid(input_Transformer)
         # LSTM-SNP提取全局信息
-        out_Global = (torch.tanh(self.global_temporal_conv_gate1(input_time.permute(0, 3, 2, 1)))
-                    * torch.sigmoid(self.global_temporal_conv_gate2(input_time.permute(0, 3, 2, 1)))).permute(
-        0, 2, 3, 1)
+        # out_Global = (torch.tanh(self.global_temporal_conv_gate1(input_time.permute(0, 3, 2, 1)))
+        #             * torch.sigmoid(self.global_temporal_conv_gate2(input_time.permute(0, 3, 2, 1)))).permute(
+        # 0, 2, 3, 1)
 
-        out_Global = self.conv4(out_Global)
-        out_Global = out_Global.permute(0, 2, 3, 1).reshape(B*N, T, H)
-        out_Global, _ = self.T_Global(out_Global)
-        out_Global = out_Global.reshape(-1, N, T * H)
+        # out_Global = self.conv4(out_Global)
+        # out_Global = out_Global.permute(0, 2, 3, 1).reshape(B*N, T, H)
+        # out_Global, _ = self.T_Global(out_Global)
+        # out_Global = out_Global.reshape(-1, N, T * H)
 
         # 提取长时间信息
         out_G = (torch.tanh(self.global_temporal_conv_gate1(input_time.permute(0, 3, 2, 1)))
@@ -282,7 +283,8 @@ class STBlock(nn.Module):
         out_L = self.T_L(out_L, out_L, out_L, 4).reshape(-1, N, T * H)
 
         g = torch.sigmoid(self.fs(out_L) + self.fg(out_G))
-        output_T = g * out_L + (1 - g) * out_G + 0.1 * out_Global
+        output_T = g * out_L + (1 - g) * out_G
+        # output_T = g * out_L + (1 - g) * out_G + 0.1 * out_Global
         output_T = self.norm2(output_T.reshape(B, N, T, H) + input_time)
         # 融合时间+空间
         # out = self.Att(output_T.reshape(-1, 207, 768), output_S.reshape(-1, 207, 768),
