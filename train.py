@@ -62,7 +62,8 @@ if __name__ == "__main__":
     best_mape = None
     best_epoch = 0
 
-    exp_dir = os.path.join(args.exp_dir, args.exp_name)
+    # exp_dir = os.path.join(args.exp_dir, args.exp_name)
+    exp_dir = os.path.join(args.exp_dir)
     if os.path.exists(exp_dir) == False:
         os.makedirs(exp_dir)
     log_save_dir = f"{exp_dir}/{args.exp_name}_{ args.pre_len * 5}min_{args.dataset}_mean_std.txt"
