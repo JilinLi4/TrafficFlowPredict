@@ -242,7 +242,6 @@ class STBlock(nn.Module):
         self.pyramid = MultiScaleModule(T_dim, 2, node_size=307)
 
     def forward(self, x):
-        x = self.pyramid(x)
         input_Transformer = x # torch.Size([16, 307, 12, 64])
         B, N, T, H = input_Transformer.shape
         # **********************************************************************************************
@@ -251,9 +250,10 @@ class STBlock(nn.Module):
         # 残差+层归一化
         output_S = self.norm1(output_S + input_Transformer)
         # **********************************************************************************************
+        input_time = self.pyramid(input_Transformer)
         # LSTM-SNP提取全局信息
-        out_Global = (torch.tanh(self.global_temporal_conv_gate1(input_Transformer.permute(0, 3, 2, 1)))
-                    * torch.sigmoid(self.global_temporal_conv_gate2(input_Transformer.permute(0, 3, 2, 1)))).permute(
+        out_Global = (torch.tanh(self.global_temporal_conv_gate1(input_time.permute(0, 3, 2, 1)))
+                    * torch.sigmoid(self.global_temporal_conv_gate2(input_time.permute(0, 3, 2, 1)))).permute(
         0, 2, 3, 1)
 
         out_Global = self.conv4(out_Global)
@@ -262,28 +262,28 @@ class STBlock(nn.Module):
         out_Global = out_Global.reshape(-1, N, T * H)
 
         # 提取长时间信息
-        out_G = (torch.tanh(self.global_temporal_conv_gate1(input_Transformer.permute(0, 3, 2, 1)))
-                       * torch.sigmoid(self.global_temporal_conv_gate2(input_Transformer.permute(0, 3, 2, 1)))).permute(
+        out_G = (torch.tanh(self.global_temporal_conv_gate1(input_time.permute(0, 3, 2, 1)))
+                       * torch.sigmoid(self.global_temporal_conv_gate2(input_time.permute(0, 3, 2, 1)))).permute(
             0, 2, 3, 1)
 
         out_G = self.conv4(out_G)
         out_G = out_G.permute(0, 2, 3, 1)
-        out_G = self.norm3(out_G + input_Transformer)
+        out_G = self.norm3(out_G + input_time)
         out_G = self.T_G(out_G, out_G, out_G, 4).reshape(-1, N, T * H)
         
 
         # 提取局部时间信息
-        out_L = self.pool(torch.tanh(self.local_tempooral_conv_gate1(input_Transformer.permute(0, 3, 2, 1)))
+        out_L = self.pool(torch.tanh(self.local_tempooral_conv_gate1(input_time.permute(0, 3, 2, 1)))
                           * torch.sigmoid(
-            self.local_tempooral_conv_gate2(input_Transformer.permute(0, 3, 2, 1)))).permute(0, 2, 3, 1)
+            self.local_tempooral_conv_gate2(input_time.permute(0, 3, 2, 1)))).permute(0, 2, 3, 1)
         out_L = self.conv5(out_L)
         out_L = out_L.permute(0, 2, 3, 1)
-        out_L = self.norm4(out_L + input_Transformer)
+        out_L = self.norm4(out_L + input_time)
         out_L = self.T_L(out_L, out_L, out_L, 4).reshape(-1, N, T * H)
 
         g = torch.sigmoid(self.fs(out_L) + self.fg(out_G))
         output_T = g * out_L + (1 - g) * out_G + 0.1 * out_Global
-        output_T = self.norm2(output_T.reshape(B, N, T, H) + input_Transformer)
+        output_T = self.norm2(output_T.reshape(B, N, T, H) + input_time)
         # 融合时间+空间
         # out = self.Att(output_T.reshape(-1, 207, 768), output_S.reshape(-1, 207, 768),
         #                output_S.reshape(-1, 207, 768)).reshape(-1, 207, 12, 64)

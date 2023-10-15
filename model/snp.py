@@ -253,7 +253,8 @@ class Bottleneck_Construct(nn.Module):
         enc_input_v = self.down(enc_input)
         enc_input_a = self.down_att(enc_input)
 
-        all_inputs = all_inputs_v * all_inputs_a + enc_input_v * enc_input_a
+        all_inputs = all_inputs_v + enc_input_v
+        # all_inputs = all_inputs_v * all_inputs_a + enc_input_v * enc_input_a
         # all_inputs = self.norm(all_inputs)
         return all_inputs
 
